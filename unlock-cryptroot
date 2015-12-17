@@ -1,0 +1,211 @@
+#!/bin/sh
+
+usage() {
+    cat <<EOF
+${0##*/}:  Remotely unlock a LUKS-encrypted Debian/Ubuntu root filesystem
+
+Works around:
+  * Ubuntu bug #595648
+    <https://bugs.launchpad.net/bugs/595648>
+  * Debian bug #782024
+    <https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=782024>
+
+Usage:  $0 [options] [--] <host>
+
+Arguments:
+
+  -h, --help
+    Display this usage message and exit
+
+  -i <identity_file>, --identity <identity_file>, --identity=<identity_file>
+    Path to the SSH private key.
+    Default: ${idbase}<host>
+
+  -k <knownhosts>, --known-hosts <knownhosts>, --known-hosts=<knownhosts>
+    Path to the 'known_hosts' file.
+    Default: ${knownhosts}
+
+  -l, --login
+    Just log in, don't try to unlock the system.
+
+  --
+    End of options; treat the next argument as the hostname even if it
+    begins with '-'.
+
+  <host>
+    The name of the remote system to unlock
+EOF
+}
+
+# handy logging and error handling functions
+pecho() { printf %s\\n "$*"; }
+log() { pecho "$@"; }
+error() { log "ERROR: $@" >&2; }
+fatal() { error "$@"; exit 1; }
+try() { "$@" || fatal "'$@' failed"; }
+usage_fatal() { usage >&2; pecho "" >&2; fatal "$@"; }
+
+# quote special characters so that:
+#    eval "set -- $(shell_quote "$@")"
+# is always a no-op no matter what values are in the positional
+# parameters.  note that it is run in a subshell to protect the
+# caller's environment.
+shell_quote() (
+    sep=
+    for i in "$@"; do
+        iesc=$(pecho "${i}eoi" | sed -e "s/'/'\\\\''/g")
+        iesc=\'${iesc%eoi}\'
+        printf %s "${sep}${iesc}"
+        sep=" "
+    done
+)
+
+# parse arguments
+knownhosts=~/.ssh/known_hosts.initramfs
+idbase=~/.ssh/id_rsa.initramfs_
+unset id
+runscript=true
+while [ "$#" -gt 0 ]; do
+    arg=$1
+    case $1 in
+        # convert "--opt=the value" to --opt "the value".
+        --*'='*) shift; set -- "${arg%%=*}" "${arg#*=}" "$@"; continue;;
+        -h|--help) usage; exit 0;;
+        -i|--identity) shift; id=$1;;
+        -k|--known-hosts) shift; knownhosts=$1;;
+        -l|--login) runscript=false;;
+        --) shift; break;;
+        -*) usage_fatal "unknown option: '$1'";;
+        *) break;;
+    esac
+    shift || usage_fatal "option '${arg}' requires a value"
+done
+[ "$#" -ge 1 ] || usage_fatal "no hostname specified"
+host=$1; shift
+[ "$#" -eq 0 ] || fatal "unknown argument: '$1'"
+
+[ -n "${id+set}" ] || id=${idbase}${host%%.*}
+[ -r "${id}" ] || fatal "can't read ssh key ${id}"
+
+
+script='#!/bin/sh
+PATH=/sbin:${PATH}
+
+pecho() { printf %s\\n "$*"; }
+log() { pecho "$@"; }
+warn() { log "WARNING: $@" >&2; }
+error() { log "ERROR: $@" >&2; }
+fatal() { error "$@"; exit 1; }
+try() { "$@" || fatal "'\''$@'\'' failed"; }
+
+getpid() {
+    psout=$(try ps) || exit 1
+    psout=$(pecho "${psout}" | grep "$1") || return 0
+    pswc=$(pecho "${psout}" | try wc -l) || exit 1
+    [ "${pswc}" -eq 1 ] || fatal "more than one instance of $1:
+${psout}"
+    pecho "${psout}" | try awk '\''{print$1}'\'' || exit 1
+}
+
+# if cryptroot is not running, then there is no password prompt so
+# there is nothing to do
+log "checking if /scripts/local-top/cryptroot is running..."
+cr_pid=$(getpid "/scripts/local-top/[c]ryptroot") || exit 1
+[ -n "${cr_pid}" ] || fatal "/scripts/local-top/cryptroot is not running"
+
+unset pw
+
+# keep prompting for a password over and over until cryptroot has
+# finished running
+while true; do
+    cs_pid=$(getpid "/sbin/[c]ryptsetup") || exit 1
+    [ -n "${cs_pid}" ] || {
+        log "waiting to see if there will be another passphrase prompt..."
+        # the next commands are all on one line so that they are still
+        # in busybox memory if the root filesystem is mounted during
+        # the sleep (which would cause this script to disappear during
+        # execution)
+        sleep 1; [ -d /proc/"${cr_pid}" ] || { log "done"; exit 0; }
+        continue
+    }
+
+    log "getting /sbin/cryptsetup command-line arguments..."
+    cs_args=$(try tr "\\0" "\\n" </proc/${cs_pid}/cmdline) || exit 1
+    set --
+    while IFS= read -r line; do
+        set -- "$@" "${line}"
+        # error out if "cryptsetup remove" is running because that
+        # means the cryptroot script had an error
+        case $2 in remove) fatal "'\''cryptsetup remove'\'' is running";; esac
+    done <<EOF
+${cs_args}
+EOF
+    log "command: $@"
+
+    [ -n "${pw+set}" ] && {
+        log "trying previously entered passphrase..."
+        printf %s "${pw}" | try "$@"
+    } || {
+        pw=$(try /lib/cryptsetup/askpass "Enter passphrase: " && echo x) \
+            || exit 1
+        pw=${pw%x}
+        printf %s "${pw}" | try "$@" || exit 1
+    }
+
+    log "passphrase accepted; killing passphrase prompt..."
+    for ap in \
+        "/lib/cryptsetup/[a]skpass" \
+        "[a]sk-for-password" \
+        ;
+    do
+        log "  checking for ${ap}..."
+        ap_pid=$(getpid "${ap}") || exit 1
+        [ -n "${ap_pid}" ] || continue
+        log "    killing PID ${ap_pid}..."
+        try kill "${ap_pid}"
+    done
+done
+'
+
+run_ssh() {
+    unset forcetty
+    case $1 in -t) forcetty=$1; shift;; esac
+    ssh -o UserKnownHostsFile="${knownhosts}" \
+        -i "${id}" \
+        ${forcetty} \
+        root@"${host}" "$@"
+}
+
+# $1 is the shell command to run; must be < 1024 characters (busybox
+# limitation?)
+run_ssh_cmd() {
+    unset forcetty
+    case $1 in -t) forcetty=$1; shift;; esac
+    sshcmd='sh -c '$(shell_quote "$1")' -'
+    run_ssh ${forcetty} "${sshcmd}"
+}
+
+"${runscript}" || {
+    while IFS= read -r line; do
+        log "${line}"
+    done <<\EOF
+After you are logged in:
+  1. use 'ps -l' to get cryptsetup's command-line arguments
+  2. run:
+         /lib/cryptsetup/askpass "Enter passphrase: " \
+             | /sbin/cryptsetup <args go here>
+  3. kill 'plymouth ask-for-password' or 'askpass' as appropriate
+  4. log out
+
+EOF
+    run_ssh
+    exit $?
+}
+
+log "sending script to ${host}..."
+pecho "${script}" |
+run_ssh_cmd 'cat >tmp.sh && chmod +x tmp.sh' \
+    || fatal "unable to create script"
+
+log "running script on ${host}..."
+run_ssh_cmd -t './tmp.sh'

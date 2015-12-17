@@ -1,0 +1,25 @@
+# INSTRUCTIONS:
+#   1. change eth0 to whatever is appropriate for your system
+#   2. install this file to /etc/systemd/system/deconfigure-<ifname>.service
+#   3. run 'sudo systemctl enable deconfigure-<ifname>.service'
+
+# About this service:
+#
+# In order to get remote cryptsetup luks unlocking to work, a kernel
+# command line option was added to /etc/default/grub to configure
+# networking at boot.  This causes NetworkManager to fail to bring up
+# the interface properly because the interface already has an IP
+# address.  This script fixes that by clearing all IPv4 addresses
+# before NetworkManager runs.
+
+[Unit]
+Description=Pre-NM Network Interface Deconfigurer
+Before=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ip address flush dev eth0
+ExecStart=/sbin/ip link set eth0 down
+
+[Install]
+WantedBy=NetworkManager.service

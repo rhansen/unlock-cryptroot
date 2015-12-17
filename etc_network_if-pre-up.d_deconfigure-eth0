@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# INSTRUCTIONS:
+#   1. change eth0 to whatever is appropriate for your system
+#   2. install this file to /etc/network/if-pre-up.d/deconfigure-<ifname>
+#   3. make sure the file is executable
+
+# About this script:
+#
+# In order to get remote cryptsetup luks unlocking to work, a kernel
+# command line option was added to /etc/default/grub to configure
+# networking at boot.  This causes ifup to fail because the interface
+# already has an IP address.  Fix that here by clearing all IPv4
+# addresses before ifup runs.
+
+[ "${IFACE}" = eth0 ] || exit 0
+CMD="ip -f inet address flush dev ${IFACE}"
+[ "${VERBOSITY}" != 1 ] || printf %s\\n "$0: running: ${CMD}"
+eval "exec ${CMD}"
