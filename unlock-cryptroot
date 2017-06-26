@@ -172,7 +172,7 @@ EOF
         debug "ap_pid=${ap_pid}"
         [ -n "${ap_pid}" ] || continue
         log "    killing PID ${ap_pid}..."
-        try kill "${ap_pid}"
+        try kill -KILL "${ap_pid}"
     done
 done
 END_OF_SCRIPT
