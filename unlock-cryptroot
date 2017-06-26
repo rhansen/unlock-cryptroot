@@ -88,7 +88,8 @@ host=$1; shift
 [ -r "${id}" ] || fatal "can't read ssh key ${id}"
 
 
-script='#!/bin/sh
+script=$(cat <<\END_OF_SCRIPT
+#!/bin/sh
 PATH=/sbin:${PATH}
 
 pecho() { printf %s\\n "$*"; }
@@ -96,7 +97,7 @@ log() { pecho "$@"; }
 warn() { log "WARNING: $@" >&2; }
 error() { log "ERROR: $@" >&2; }
 fatal() { error "$@"; exit 1; }
-try() { "$@" || fatal "'\''$@'\'' failed"; }
+try() { "$@" || fatal "'$@' failed"; }
 
 getpid() {
     psout=$(try ps) || exit 1
@@ -104,7 +105,7 @@ getpid() {
     pswc=$(pecho "${psout}" | try wc -l) || exit 1
     [ "${pswc}" -eq 1 ] || fatal "more than one instance of $1:
 ${psout}"
-    pecho "${psout}" | try awk '\''{print$1}'\'' || exit 1
+    pecho "${psout}" | try awk '{print$1}' || exit 1
 }
 
 # if cryptroot is not running, then there is no password prompt so
@@ -136,7 +137,7 @@ while true; do
         set -- "$@" "${line}"
         # error out if "cryptsetup remove" is running because that
         # means the cryptroot script had an error
-        case $2 in remove) fatal "'\''cryptsetup remove'\'' is running";; esac
+        case $2 in remove) fatal "'cryptsetup remove' is running";; esac
     done <<EOF
 ${cs_args}
 EOF
@@ -165,7 +166,8 @@ EOF
         try kill "${ap_pid}"
     done
 done
-'
+END_OF_SCRIPT
+)
 
 run_ssh() {
     unset forcetty
