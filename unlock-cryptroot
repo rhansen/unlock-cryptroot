@@ -131,7 +131,7 @@ while true; do
     }
 
     log "getting /sbin/cryptsetup command-line arguments..."
-    cs_args=$(try tr "\\0" "\\n" </proc/${cs_pid}/cmdline) || exit 1
+    cs_args=$(try tr \\0 \\n </proc/${cs_pid}/cmdline) || exit 1
     set --
     while IFS= read -r line; do
         set -- "$@" "${line}"
