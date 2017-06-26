@@ -135,12 +135,12 @@ while true; do
     set --
     while IFS= read -r line; do
         set -- "$@" "${line}"
-        # error out if "cryptsetup remove" is running because that
-        # means the cryptroot script had an error
-        case $2 in remove) fatal "'cryptsetup remove' is running";; esac
     done <<EOF
 ${cs_args}
 EOF
+    # error out if "cryptsetup remove" is running because that means
+    # the cryptroot script had an error
+    case $2 in remove) fatal "'cryptsetup remove' is running";; esac
     log "command: $@"
 
     [ -n "${pw+set}" ] && {
