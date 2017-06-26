@@ -40,6 +40,7 @@ EOF
 # handy logging and error handling functions
 pecho() { printf %s\\n "$*"; }
 log() { pecho "$@"; }
+debug() { : log "DEBUG: $@" >&2; }
 error() { log "ERROR: $@" >&2; }
 fatal() { error "$@"; exit 1; }
 try() { "$@" || fatal "'$@' failed"; }
@@ -94,15 +95,19 @@ PATH=/sbin:${PATH}
 
 pecho() { printf %s\\n "$*"; }
 log() { pecho "$@"; }
+debug() { : log "DEBUG: $@" >&2; }
 warn() { log "WARNING: $@" >&2; }
 error() { log "ERROR: $@" >&2; }
 fatal() { error "$@"; exit 1; }
 try() { "$@" || fatal "'$@' failed"; }
 
 getpid() {
+    debug "finding pid for $1"
     psout=$(try ps) || exit 1
     psout=$(pecho "${psout}" | grep "$1") || return 0
+    debug "psout=${psout}"
     pswc=$(pecho "${psout}" | try wc -l) || exit 1
+    debug "pswc=${pswc}"
     [ "${pswc}" -eq 1 ] || fatal "more than one instance of $1:
 ${psout}"
     pecho "${psout}" | try awk '{print$1}' || exit 1
@@ -112,6 +117,7 @@ ${psout}"
 # there is nothing to do
 log "checking if /scripts/local-top/cryptroot is running..."
 cr_pid=$(getpid "/scripts/local-top/[c]ryptroot") || exit 1
+debug "cr_pid=${cr_pid}"
 [ -n "${cr_pid}" ] || fatal "/scripts/local-top/cryptroot is not running"
 
 unset pw
@@ -120,6 +126,7 @@ unset pw
 # finished running
 while true; do
     cs_pid=$(getpid "/sbin/[c]ryptsetup") || exit 1
+    debug "cs_pid=${cs_pid}"
     [ -n "${cs_pid}" ] || {
         log "waiting to see if there will be another passphrase prompt..."
         # the next commands are all on one line so that they are still
@@ -132,6 +139,7 @@ while true; do
 
     log "getting /sbin/cryptsetup command-line arguments..."
     cs_args=$(try tr \\0 \\n </proc/${cs_pid}/cmdline) || exit 1
+    debug "cs_args=${cs_args}"
     set --
     while IFS= read -r line; do
         set -- "$@" "${line}"
@@ -161,6 +169,7 @@ EOF
     do
         log "  checking for ${ap}..."
         ap_pid=$(getpid "${ap}") || exit 1
+        debug "ap_pid=${ap_pid}"
         [ -n "${ap_pid}" ] || continue
         log "    killing PID ${ap_pid}..."
         try kill "${ap_pid}"
