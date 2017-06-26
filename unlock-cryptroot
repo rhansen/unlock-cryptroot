@@ -145,7 +145,7 @@ EOF
 
     [ -n "${pw+set}" ] && {
         log "trying previously entered passphrase..."
-        printf %s "${pw}" | try "$@"
+        printf %s "${pw}" | (try "$@")
     } || {
         pw=$(try /lib/cryptsetup/askpass "Enter passphrase: " && echo x) \
             || exit 1
