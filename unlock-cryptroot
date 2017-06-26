@@ -205,9 +205,10 @@ EOF
 }
 
 log "sending script to ${host}..."
-pecho "${script}" |
 run_ssh_cmd 'cat >tmp.sh && chmod +x tmp.sh' \
-    || fatal "unable to create script"
+    <<EOF || fatal "unable to create script"
+${script}
+EOF
 
 log "running script on ${host}..."
 run_ssh_cmd -t './tmp.sh'
