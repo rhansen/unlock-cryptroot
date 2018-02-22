@@ -68,7 +68,8 @@ shell_quote() (
 # parse arguments
 knownhosts=~/.ssh/known_hosts.initramfs
 idbase=~/.ssh/id_rsa.initramfs_
-config=~/.ssh/config.initramfs
+configdefault=~/.ssh/config.initramfs
+unset config
 unset id
 runscript=true
 while [ "$#" -gt 0 ]; do
@@ -94,6 +95,18 @@ host=$1; shift
 [ -n "${id+set}" ] || id=${idbase}${host%%.*}
 [ -r "${id}" ] || fatal "can't read ssh key ${id}"
 
+if [ -z ${config+x} ]; then
+    if [ -r ${configdefault} ]; then
+	config=${configdefault}
+    fi
+else
+   [ -r "${config}" ] || fatal "can't read ssh user config file ${config}"
+fi
+if [ -z ${config+x} ]; then
+    unset sshconfigopt
+else
+    sshconfigopt="-F ${config}"
+fi
 
 script=$(cat <<\END_OF_SCRIPT
 #!/bin/sh
@@ -189,7 +202,7 @@ run_ssh() {
     case $1 in -t) forcetty=$1; shift;; esac
     ssh -o UserKnownHostsFile="${knownhosts}" \
         -i "${id}" \
-	-F "${config}" \
+	${sshconfigopt} \
         ${forcetty} \
         root@"${host}" "$@"
 }
