@@ -14,6 +14,12 @@ To unlock the target system (after initial setup; see below):
 2. Enter the password to your ssh key (if there is one).
 3. Enter the drive encryption password(s).
 
+For additional options and default file locations, run:
+
+   ```sh
+   unlock-cryptroot --help
+   ```
+   
 Tested on:
 * Ubuntu 16.04 (Xenial)
 * Ubuntu 15.10 (Wily)
