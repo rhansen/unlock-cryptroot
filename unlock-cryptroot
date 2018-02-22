@@ -25,6 +25,10 @@ Arguments:
     Path to the 'known_hosts' file.
     Default: ${knownhosts}
 
+  -c <config_file>, --config <config_file>, --config=<config_file>
+    Path to the 'config' file.
+    Default: ${config}
+
   -l, --login
     Just log in, don't try to unlock the system.
 
@@ -64,6 +68,7 @@ shell_quote() (
 # parse arguments
 knownhosts=~/.ssh/known_hosts.initramfs
 idbase=~/.ssh/id_rsa.initramfs_
+config=~/.ssh/config.initramfs
 unset id
 runscript=true
 while [ "$#" -gt 0 ]; do
@@ -71,6 +76,7 @@ while [ "$#" -gt 0 ]; do
     case $1 in
         # convert "--opt=the value" to --opt "the value".
         --*'='*) shift; set -- "${arg%%=*}" "${arg#*=}" "$@"; continue;;
+	-c|--config) shift; config=$1;;
         -h|--help) usage; exit 0;;
         -i|--identity) shift; id=$1;;
         -k|--known-hosts) shift; knownhosts=$1;;
@@ -183,6 +189,7 @@ run_ssh() {
     case $1 in -t) forcetty=$1; shift;; esac
     ssh -o UserKnownHostsFile="${knownhosts}" \
         -i "${id}" \
+	-F "${config}" \
         ${forcetty} \
         root@"${host}" "$@"
 }
