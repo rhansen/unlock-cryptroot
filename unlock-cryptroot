@@ -22,11 +22,11 @@ Arguments:
     Default: ${idbase}<host>
 
   -k <knownhosts>, --known-hosts <knownhosts>, --known-hosts=<knownhosts>
-    Path to the 'known_hosts' file.
+    Path to the ssh client's known_hosts file.
     Default: ${knownhosts}
 
   -c <config_file>, --config <config_file>, --config=<config_file>
-    Path to the 'config' file.
+    Path to the ssh client's config file.
     Default: ${config}
 
   -l, --login
