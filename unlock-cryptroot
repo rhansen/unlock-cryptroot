@@ -22,8 +22,13 @@ Arguments:
     Default: ${idbase}<host>
 
   -k <knownhosts>, --known-hosts <knownhosts>, --known-hosts=<knownhosts>
-    Path to the 'known_hosts' file.
+    Path to the ssh client's known_hosts file.
     Default: ${knownhosts}
+
+  -c <config_file>, --config <config_file>, --config=<config_file>
+    Path to the ssh client's config file.
+    Default: ${configdefault}
+             (if it exists, otherwise the ssh default is used)
 
   -l, --login
     Just log in, don't try to unlock the system.
@@ -64,6 +69,8 @@ shell_quote() (
 # parse arguments
 knownhosts=~/.ssh/known_hosts.initramfs
 idbase=~/.ssh/id_rsa.initramfs_
+configdefault=~/.ssh/config.initramfs
+unset config
 unset id
 runscript=true
 while [ "$#" -gt 0 ]; do
@@ -71,6 +78,7 @@ while [ "$#" -gt 0 ]; do
     case $1 in
         # convert "--opt=the value" to --opt "the value".
         --*'='*) shift; set -- "${arg%%=*}" "${arg#*=}" "$@"; continue;;
+        -c|--config) shift; config=$1;;
         -h|--help) usage; exit 0;;
         -i|--identity) shift; id=$1;;
         -k|--known-hosts) shift; knownhosts=$1;;
@@ -84,10 +92,8 @@ done
 [ "$#" -ge 1 ] || usage_fatal "no hostname specified"
 host=$1; shift
 [ "$#" -eq 0 ] || fatal "unknown argument: '$1'"
-
 [ -n "${id+set}" ] || id=${idbase}${host%%.*}
-[ -r "${id}" ] || fatal "can't read ssh key ${id}"
-
+[ -n "${config+set}" ] || ! [ -e "${configdefault}" ] || config=${configdefault}
 
 script=$(cat <<\END_OF_SCRIPT
 #!/bin/sh
@@ -183,6 +189,7 @@ run_ssh() {
     case $1 in -t) forcetty=$1; shift;; esac
     ssh -o UserKnownHostsFile="${knownhosts}" \
         -i "${id}" \
+        ${config+-F "${config}"} \
         ${forcetty} \
         root@"${host}" "$@"
 }
