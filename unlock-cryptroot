@@ -27,7 +27,7 @@ Arguments:
 
   -c <config_file>, --config <config_file>, --config=<config_file>
     Path to the ssh client's config file.
-    Default: ${config}
+    Default: ${configdefault}
 
   -l, --login
     Just log in, don't try to unlock the system.
