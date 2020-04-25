@@ -93,12 +93,7 @@ done
 host=$1; shift
 [ "$#" -eq 0 ] || fatal "unknown argument: '$1'"
 [ -n "${id+set}" ] || id=${idbase}${host%%.*}
-
-if [ -z "${config+set}" ]; then
-    if [ -e "${configdefault}" ]; then
-        config=${configdefault}
-    fi
-fi
+[ -n "${config+set}" ] || ! [ -e "${configdefault}" ] || config=${configdefault}
 
 script=$(cat <<\END_OF_SCRIPT
 #!/bin/sh
