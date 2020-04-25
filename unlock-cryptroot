@@ -91,16 +91,12 @@ done
 [ "$#" -ge 1 ] || usage_fatal "no hostname specified"
 host=$1; shift
 [ "$#" -eq 0 ] || fatal "unknown argument: '$1'"
-
 [ -n "${id+set}" ] || id=${idbase}${host%%.*}
-[ -r "${id}" ] || fatal "can't read ssh key ${id}"
 
 if [ -z "${config+set}" ]; then
-    if [ -r "${configdefault}" ]; then
+    if [ -e "${configdefault}" ]; then
         config=${configdefault}
     fi
-else
-    [ -r "${config}" ] || fatal "can't read ssh user config file ${config}"
 fi
 
 script=$(cat <<\END_OF_SCRIPT
