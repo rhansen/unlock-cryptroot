@@ -102,11 +102,6 @@ if [ -z "${config+set}" ]; then
 else
     [ -r "${config}" ] || fatal "can't read ssh user config file ${config}"
 fi
-if [ -z "${config+set}" ]; then
-    unset sshconfigopt
-else
-    sshconfigopt="-F ${config}"
-fi
 
 script=$(cat <<\END_OF_SCRIPT
 #!/bin/sh
@@ -202,7 +197,7 @@ run_ssh() {
     case $1 in -t) forcetty=$1; shift;; esac
     ssh -o UserKnownHostsFile="${knownhosts}" \
         -i "${id}" \
-        ${sshconfigopt} \
+        ${config+-F "${config}"} \
         ${forcetty} \
         root@"${host}" "$@"
 }
