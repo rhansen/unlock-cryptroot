@@ -77,7 +77,7 @@ while [ "$#" -gt 0 ]; do
     case $1 in
         # convert "--opt=the value" to --opt "the value".
         --*'='*) shift; set -- "${arg%%=*}" "${arg#*=}" "$@"; continue;;
-	-c|--config) shift; config=$1;;
+        -c|--config) shift; config=$1;;
         -h|--help) usage; exit 0;;
         -i|--identity) shift; id=$1;;
         -k|--known-hosts) shift; knownhosts=$1;;
@@ -97,10 +97,10 @@ host=$1; shift
 
 if [ -z ${config+x} ]; then
     if [ -r ${configdefault} ]; then
-	config=${configdefault}
+        config=${configdefault}
     fi
 else
-   [ -r "${config}" ] || fatal "can't read ssh user config file ${config}"
+    [ -r "${config}" ] || fatal "can't read ssh user config file ${config}"
 fi
 if [ -z ${config+x} ]; then
     unset sshconfigopt
@@ -202,7 +202,7 @@ run_ssh() {
     case $1 in -t) forcetty=$1; shift;; esac
     ssh -o UserKnownHostsFile="${knownhosts}" \
         -i "${id}" \
-	${sshconfigopt} \
+        ${sshconfigopt} \
         ${forcetty} \
         root@"${host}" "$@"
 }
