@@ -18,7 +18,6 @@ unlock-cryptroot --help
 
 Tested on:
   * Ubuntu 16.04 (Xenial)
-  * Ubuntu 15.10 (Wily)
   * Ubuntu 14.04 (Trusty)
 
 Relevant bug reports:
@@ -34,8 +33,8 @@ from remote):
   1. Boot the target machine
   2. Install dropbear into the initramfs:
        * For 16.04 (Xenial): `sudo apt-get install dropbear-initramfs`
-       * For 15.10 (Wily) and older: `sudo apt-get install dropbear`
-  3. If you are running 15.10 (Wily) or older, or if you are running
+       * For 14.04 (Trusty) and older: `sudo apt-get install dropbear`
+  3. If you are running 14.04 (Trusty) or older, or if you are running
      16.04 (Xenial) and you wish to use a non-default IP address or
      device, set the [`ip=` kernel boot
      parameter](https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt):
@@ -44,7 +43,7 @@ from remote):
        3. Save your changes
        4. Run `sudo update-grub` to install the changes
   4. For 16.04 (Xenial) only: Prepare keys for public key authentication
-     (this is already done for you on 15.10 (Wily) and older):
+     (this is already done for you on 14.04 (Trusty) and older):
        1. Generate an ssh key pair for logging in to the initramfs:
           ```sh
           sudo sh -c '(umask 0077 && mkdir -p /etc/initramfs-tools/root/.ssh)'
@@ -60,7 +59,7 @@ from remote):
           ```sh
           sudo update-initramfs -u
           ```
-  5. For 15.10 (Wily) and older (fixed in 16.04 (Xenial)):  The kernel
+  5. For 14.04 (Trusty) and older (fixed in 16.04 (Xenial)):  The kernel
      `ip=` parameter conflicts with the system's normal networking
      configuration, so you must set up a script to deconfigure the
      interface after the drive is unlocked but before the normal
