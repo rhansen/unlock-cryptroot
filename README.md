@@ -102,7 +102,7 @@ Relevant bug reports:
      networking configuration, so you must set up a script to
      deconfigure the interface after the drive is unlocked but before
      the normal networking configuration is applied. See the example
-     `etc_*` files.
+     `etc_*` file.
 
 ## Remote Workstation Setup Instructions
 

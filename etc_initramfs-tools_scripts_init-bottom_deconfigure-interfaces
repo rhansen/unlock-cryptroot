@@ -1,0 +1,47 @@
+#!/bin/sh
+
+# ABOUT THIS SCRIPT:
+#
+# This script was copied from:
+# https://github.com/rhansen/unlock-cryptroot
+#
+# This script deconfigures network interfaces that were configured by
+# the initramfs during early boot. This avoids conflicts with the
+# normal networking setup that runs during boot after initramfs is
+# done.
+#
+# This script is only intended to be used in conjunction with a
+# dropbear ssh server in the initramfs for remote unlocking of
+# encrypted filesystems. In particular, it MUST NOT be used to
+# deconfigure interfaces that are used by a network filesystem for a
+# critical mount (otherwise the system might fail to boot).
+
+# INSTRUCTIONS:
+#
+#   1. Change eth0 below to whatever is appropriate for your system.
+#   2. Install this file to
+#      /etc/initramfs-tools/scripts/init-bottom/deconfigure-interfaces
+#   3. Make sure the file is executable
+#   4. Update your initramfs: sudo update-initramfs -u
+
+# Space-separated list of interface names
+INTERFACES="eth0"
+
+# Let dropbear clean up before deconfiguring the interfaces.
+[ "$1" != prereqs ] || { echo dropbear; exit 0; }
+
+for i in ${INTERFACES}; do
+    # When dropbear (or anything else that configures networking) is
+    # installed in the initramfs, Ubuntu 18.04 (Bionic) and later
+    # creates a /run/netplan/<interface>.yaml file during boot to keep
+    # the interface configuration stable in case a critical mount uses
+    # a networking filesystem. The yaml file forces the use of
+    # systemd-networkd for managing the interface, overriding the
+    # default configuration. Deleting the file allows the regular
+    # network configuation to manage the interface.
+    rm -f "/run/netplan/${i}.yaml"
+
+    # Some versions of NetworkManager and ifup will fail to configure
+    # an interface if the interface already has an IP address.
+    ip -f inet address flush dev "${i}"
+done
