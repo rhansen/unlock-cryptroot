@@ -185,13 +185,10 @@ END_OF_SCRIPT
 )
 
 run_ssh() {
-    unset forcetty
-    case $1 in -t) forcetty=$1; shift;; esac
     ssh -o UserKnownHostsFile="${knownhosts}" \
         -i "${id}" \
         ${config+-F "${config}"} \
-        ${forcetty} \
-        root@"${host}" "$@"
+        "$@"
 }
 
 # $1 is the shell command to run; must be < 1024 characters (busybox
@@ -200,7 +197,7 @@ run_ssh_cmd() {
     unset forcetty
     case $1 in -t) forcetty=$1; shift;; esac
     sshcmd='sh -c '$(shell_quote "$1")' -'
-    run_ssh ${forcetty} "${sshcmd}"
+    run_ssh ${forcetty} root@"${host}" "${sshcmd}"
 }
 
 ! "${login}" || {
@@ -216,7 +213,7 @@ After you are logged in:
   4. log out
 
 EOF
-    run_ssh
+    run_ssh root@"${host}"
     exit $?
 }
 
