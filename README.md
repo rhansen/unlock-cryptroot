@@ -17,6 +17,7 @@ unlock-cryptroot --help
 ```
 
 Tested on:
+  * Ubuntu 18.04 (Bionic)
   * Ubuntu 16.04 (Xenial)
   * Ubuntu 14.04 (Trusty)
 
@@ -27,7 +28,51 @@ Relevant bug reports:
 
 ## Target Setup Instructions
 
-### Ubuntu 16.04 (Xenial Xerus) or newer
+### Ubuntu 18.04 (Bionic Beaver) or newer
+
+  1. Edit `/etc/crypttab` and add the `initramfs` option to each
+     device you want to be able to remotely unlock during boot. See
+     [`man 5
+     crypttab`](https://manpages.ubuntu.com/manpages/bionic/man5/crypttab.5.html)
+     for details. (The `initramfs` option is not necessary for the
+     root device or any resume devices, but it doesn't hurt.) Update
+     your initramfs after making any changes (`sudo update-initramfs
+     -u`).
+  2. Install the dropbear ssh server into the initramfs:
+     ```sh
+     sudo apt-get install dropbear-initramfs
+     ```
+  3. If you wish to use a non-default IP address or network device,
+     set the [`ip=` kernel boot
+     parameter](https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt):
+       1. Edit `/etc/default/grub`
+       2. Add your `ip=` parameter to the `GRUB_CMDLINE_LINUX` variable
+       3. Save your changes
+       4. Run `sudo update-grub` to install the changes
+  4. Prepare keys for public key authentication:
+       1. Generate an ssh key pair for logging in to the initramfs:
+          ```sh
+          sudo sh -c '(umask 0077 && mkdir -p /etc/initramfs-tools/root/.ssh)'
+          sudo ssh-keygen -t rsa -b 4096 -o -a 100 \
+              -f /etc/initramfs-tools/root/.ssh/id_rsa
+          ```
+       2. Add the public key to the initramfs's `authorized_keys`:
+          ```sh
+          sudo cp /etc/initramfs-tools/root/.ssh/id_rsa.pub \
+              /etc/initramfs-tools/root/.ssh/authorized_keys
+          ```
+       3. Update the initramfs:
+          ```sh
+          sudo update-initramfs -u
+          ```
+  5. At boot, Ubuntu's initramfs will create a Netplan config file for
+     your network interface. This config file overrides the default
+     network configuration for that interface. If you do not want this
+     override, install an initramfs script that deletes the Netplan
+     config file after your system is unlocked. See the example
+     `etc_*` file.
+
+### Ubuntu 16.04 (Xenial Xerus)
 
   1. Edit `/etc/crypttab` and add the `initramfs` option to each
      device you want to be able to remotely unlock during boot. See
