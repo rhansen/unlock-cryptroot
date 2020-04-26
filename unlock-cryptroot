@@ -184,12 +184,30 @@ done
 END_OF_SCRIPT
 )
 
+cleanup_script=''
+trap 'eval " ${cleanup_script}"' EXIT
+trap 'exit 1' ALRM HUP INT PIPE TERM USR1 USR2
+
+ssh_control_dir=$(try mktemp -d) || exit 1
+cleanup_script='rm -rf "${ssh_control_dir}"; '${cleanup_script}
+ssh_control=${ssh_control_dir}/control
+
 run_ssh() {
     ssh -o UserKnownHostsFile="${knownhosts}" \
         -i "${id}" \
         ${config+-F "${config}"} \
+        -S "${ssh_control}" \
         "$@"
 }
+
+log "Opening master connection to ${host}..."
+try run_ssh -M -N -f root@"${host}"
+cleanup_script='
+    log "Closing master connection to ${host}..."
+    # Use try to get a nice error message but run it in a subshell to
+    # avoid exiting the cleanup script early.
+    (try run_ssh -O exit root@"${host}")
+'${cleanup_script}
 
 # $1 is the shell command to run; must be < 1024 characters (busybox
 # limitation?)
