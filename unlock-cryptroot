@@ -72,7 +72,7 @@ idbase=~/.ssh/id_rsa.initramfs_
 configdefault=~/.ssh/config.initramfs
 unset config
 unset id
-runscript=true
+login=false
 while [ "$#" -gt 0 ]; do
     arg=$1
     case $1 in
@@ -82,7 +82,7 @@ while [ "$#" -gt 0 ]; do
         -h|--help) usage; exit 0;;
         -i|--identity) shift; id=$1;;
         -k|--known-hosts) shift; knownhosts=$1;;
-        -l|--login) runscript=false;;
+        -l|--login) login=true;;
         --) shift; break;;
         -*) usage_fatal "unknown option: '$1'";;
         *) break;;
@@ -203,7 +203,7 @@ run_ssh_cmd() {
     run_ssh ${forcetty} "${sshcmd}"
 }
 
-"${runscript}" || {
+! "${login}" || {
     while IFS= read -r line; do
         log "${line}"
     done <<\EOF
