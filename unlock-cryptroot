@@ -72,7 +72,7 @@ idbase=~/.ssh/id_rsa.initramfs_
 configdefault=~/.ssh/config.initramfs
 unset config
 unset id
-runscript=true
+login=false
 while [ "$#" -gt 0 ]; do
     arg=$1
     case $1 in
@@ -82,7 +82,7 @@ while [ "$#" -gt 0 ]; do
         -h|--help) usage; exit 0;;
         -i|--identity) shift; id=$1;;
         -k|--known-hosts) shift; knownhosts=$1;;
-        -l|--login) runscript=false;;
+        -l|--login) login=true;;
         --) shift; break;;
         -*) usage_fatal "unknown option: '$1'";;
         *) break;;
@@ -95,7 +95,10 @@ host=$1; shift
 [ -n "${id+set}" ] || id=${idbase}${host%%.*}
 [ -n "${config+set}" ] || ! [ -e "${configdefault}" ] || config=${configdefault}
 
-script=$(cat <<\END_OF_SCRIPT
+# Script to run inside the initramfs for Ubuntu 16.04 (Xenial) and
+# older. Newer versions of Ubuntu have a /bin/cryptroot-unlock script
+# already in the initramfs.
+legacy_script=$(cat <<\END_OF_SCRIPT
 #!/bin/sh
 PATH=/sbin:${PATH}
 
@@ -184,15 +187,30 @@ done
 END_OF_SCRIPT
 )
 
+cleanup_script=''
+trap 'eval " ${cleanup_script}"' EXIT
+trap 'exit 1' ALRM HUP INT PIPE TERM USR1 USR2
+
+ssh_control_dir=$(try mktemp -d) || exit 1
+cleanup_script='rm -rf "${ssh_control_dir}"; '${cleanup_script}
+ssh_control=${ssh_control_dir}/control
+
 run_ssh() {
-    unset forcetty
-    case $1 in -t) forcetty=$1; shift;; esac
     ssh -o UserKnownHostsFile="${knownhosts}" \
         -i "${id}" \
         ${config+-F "${config}"} \
-        ${forcetty} \
-        root@"${host}" "$@"
+        -S "${ssh_control}" \
+        "$@"
 }
+
+log "Opening master connection to ${host}..."
+try run_ssh -M -N -f root@"${host}"
+cleanup_script='
+    log "Closing master connection to ${host}..."
+    # Use try to get a nice error message but run it in a subshell to
+    # avoid exiting the cleanup script early.
+    (try run_ssh -O exit root@"${host}")
+'${cleanup_script}
 
 # $1 is the shell command to run; must be < 1024 characters (busybox
 # limitation?)
@@ -200,31 +218,39 @@ run_ssh_cmd() {
     unset forcetty
     case $1 in -t) forcetty=$1; shift;; esac
     sshcmd='sh -c '$(shell_quote "$1")' -'
-    run_ssh ${forcetty} "${sshcmd}"
+    run_ssh ${forcetty} root@"${host}" "${sshcmd}"
 }
 
-"${runscript}" || {
+! "${login}" || {
     while IFS= read -r line; do
         log "${line}"
     done <<\EOF
-After you are logged in:
-  1. use 'ps -l' to get cryptsetup's command-line arguments
-  2. run:
+After you are logged in, run cryptroot-unlock. If cryptroot-unlock is not
+available (Ubuntu 16.04 (Xenial) and older), do the following:
+  1. Use 'ps -l' to get cryptsetup's command-line arguments
+  2. Run:
          /lib/cryptsetup/askpass "Enter passphrase: " \
              | /sbin/cryptsetup <args go here>
-  3. kill 'plymouth ask-for-password' or 'askpass' as appropriate
-  4. log out
+  3. Kill 'plymouth ask-for-password' or 'askpass' as appropriate
+  4. Log out
 
 EOF
-    run_ssh
+    run_ssh root@"${host}"
     exit $?
 }
 
-log "sending script to ${host}..."
-run_ssh_cmd 'cat >tmp.sh && chmod +x tmp.sh' \
-    <<EOF || fatal "unable to create script"
-${script}
+log "Checking for cryptroot-unlock..."
+run_ssh_cmd '[ -x /bin/cryptroot-unlock ]' || {
+    log "Remote machine does not have cryptroot-unlock."
+    log "Sending script to ${host}..."
+    run_ssh_cmd 'cat >tmp.sh && chmod +x tmp.sh' \
+        <<EOF || fatal "failed to create script"
+${legacy_script}
 EOF
+    log "Running script on ${host}..."
+    run_ssh_cmd -t './tmp.sh'
+    exit $?
+}
 
-log "running script on ${host}..."
-run_ssh_cmd -t './tmp.sh'
+log "Running cryptroot-unlock..."
+run_ssh_cmd -t '/bin/cryptroot-unlock'
